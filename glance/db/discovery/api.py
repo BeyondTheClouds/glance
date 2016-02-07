@@ -334,6 +334,7 @@ def _paginate_query(query, model, limit, sort_keys, marker=None,
     :rtype: sqlalchemy.orm.query.Query
     :return: The query with sorting/pagination added.
     """
+    return query
 
     if 'id' not in sort_keys:
         # TODO(justinsb): If this ever gives a false-positive, check
@@ -506,9 +507,10 @@ def _select_images_query(context, image_conditions, admin_as_user,
     img_conditional_clause = and_(*image_conditions)
 
     regular_user = (not context.is_admin) or admin_as_user
+    regular_user = False
 
     query_member = session.query(models.Image).join(
-        models.Image.members).filter(img_conditional_clause)
+        models.ImageMember).filter(img_conditional_clause)
     if regular_user:
         member_filters = [models.ImageMember.deleted == False]
         if context.owner is not None:
@@ -566,7 +568,17 @@ def image_get_all(context, filters=None, marker=None, limit=None,
                        relevant tag entries. This could improve upper-layer
                        query performance, to prevent using separated calls
     """
+    print("""[DEBUG_GLANCE] image_get_all(context=%s, filters=%s, marker=%s, limit=%s,
+                  sort_key=%s,                        sort_dir=%s,
+                  member_status=%s,            is_public=%s,
+                  admin_as_user=%s, return_tag=%s)""" % (context, filters, marker, limit,
+                  sort_key,                        sort_dir,
+                  member_status,            is_public,
+                  admin_as_user, return_tag))
+
+
     sort_key = ['created_at'] if not sort_key else sort_key
+    filters={}
 
     default_sort_dir = 'desc'
 
@@ -585,27 +597,41 @@ def image_get_all(context, filters=None, marker=None, limit=None,
     img_cond, prop_cond, tag_cond = _make_conditions_from_filters(
         filters, is_public)
 
+    print(type(member_status))
+    print("""will call _select_images_query(%s,
+                                 %s,
+                                 %s,
+                                 %s,
+                                 %s)""" % (context,
+                                 img_cond,
+                                 admin_as_user,
+                                 member_status,
+                                 visibility))
     query = _select_images_query(context,
                                  img_cond,
                                  admin_as_user,
                                  member_status,
                                  visibility)
-
+    print("[DEBUG_GLANCE 1] query(%s) => ?" % (query))
+    print("[DEBUG_GLANCE 1a] query(%s) => %s" % (query, query.all()))
     if visibility is not None:
         if visibility == 'public':
             query = query.filter(models.Image.is_public == True)
         elif visibility == 'private':
             query = query.filter(models.Image.is_public == False)
+    print("[DEBUG_GLANCE 1b] query(%s) => %s" % (query, query.all()))
 
     if prop_cond:
         for prop_condition in prop_cond:
             query = query.join(models.ImageProperty, aliased=True).filter(
                 and_(*prop_condition))
+    print("[DEBUG_GLANCE 1c] query(%s) => %s" % (query, query.all()))
 
     if tag_cond:
         for tag_condition in tag_cond:
             query = query.join(models.ImageTag, aliased=True).filter(
                 and_(*tag_condition))
+    print("[DEBUG_GLANCE 1d] query(%s) => %s" % (query, query.all()))
 
     marker_image = None
     if marker is not None:
@@ -617,28 +643,31 @@ def image_get_all(context, filters=None, marker=None, limit=None,
         if key not in sort_key:
             sort_key.append(key)
             sort_dir.append(default_sort_dir)
-
+    print("[DEBUG_GLANCE 2] query(%s) => %s" % (query, query.all()))
     query = _paginate_query(query, models.Image, limit,
                             sort_key,
                             marker=marker_image,
                             sort_dir=None,
                             sort_dirs=sort_dir)
-
+    print("[DEBUG_GLANCE 3] query(%s) => %s" % (query, query.all()))
     query = query.options(sa_orm.joinedload(
         models.Image.properties)).options(
             sa_orm.joinedload(models.Image.locations))
     if return_tag:
         query = query.options(sa_orm.joinedload(models.Image.tags))
-
+    images_from_db = query.all()
+    print("[DEBUG_GLANCE] query(%s) => %s" % (query, images_from_db))
     images = []
-    for image in query.all():
-        img = image[0] if type(image) is list else image
-        image_dict = img.to_dict()
+    for image in images_from_db:
+        if type(image) is list:
+            print("[ERROR_GLANCE] image => %s" % (image))
+        image_dict = image.to_dict()
         image_dict = _normalize_locations(context, image_dict,
                                           force_show_deleted=showing_deleted)
         if return_tag:
             image_dict = _normalize_tags(image_dict)
         images.append(image_dict)
+    print("[DEBUG_GLANCE] images <- %s" % (images))
     return images
 
 

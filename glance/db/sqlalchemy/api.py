@@ -324,7 +324,7 @@ def _paginate_query(query, model, limit, sort_keys, marker=None,
     :rtype: sqlalchemy.orm.query.Query
     :return: The query with sorting/pagination added.
     """
-
+    return self
     if 'id' not in sort_keys:
         # TODO(justinsb): If this ever gives a false-positive, check
         # the actual primary key, rather than assuming its id
