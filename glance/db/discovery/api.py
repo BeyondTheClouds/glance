@@ -234,9 +234,9 @@ def _image_get(context, image_id, session=None, force_show_deleted=False):
 
     try:
         query = session.query(models.Image).options(
-            sa_orm.joinedload(models.Image.properties)).options(
+            sa_orm.joinedload(models.ImageProperty)).options(
                 sa_orm.joinedload(
-                    models.Image.locations)).filter_by(id=image_id)
+                    models.ImageLocation)).filter_by(id=image_id)
 
         # filter out deleted images if context disallows it
         if not force_show_deleted and not context.can_see_deleted:
@@ -334,8 +334,9 @@ def _paginate_query(query, model, limit, sort_keys, marker=None,
     :rtype: sqlalchemy.orm.query.Query
     :return: The query with sorting/pagination added.
     """
-    return query
-
+    #return query
+    print("""_paginate_query(query, %s, %s, %s, marker=%s,
+                    sort_dir=%s, sort_dirs=%s):""" % (model, limit, sort_keys, marker, sort_dir, sort_dirs))
     if 'id' not in sort_keys:
         # TODO(justinsb): If this ever gives a false-positive, check
         # the actual primary key, rather than assuming its id
@@ -386,17 +387,19 @@ def _paginate_query(query, model, limit, sort_keys, marker=None,
                 default = None if isinstance(
                     model_attr.property.columns[0].type,
                     sqlalchemy.DateTime) else ''
-                attr = sa_sql.expression.case([(model_attr != None,
-                                              model_attr), ],
-                                              else_=default)
+                # attr = sa_sql.expression.case([(model_attr != None,
+                #                               model_attr), ],
+                #                               else_=default)
+                attr = model_attr
                 crit_attrs.append((attr == marker_values[j]))
 
             model_attr = getattr(model, sort_keys[i])
             default = None if isinstance(model_attr.property.columns[0].type,
                                          sqlalchemy.DateTime) else ''
-            attr = sa_sql.expression.case([(model_attr != None,
-                                          model_attr), ],
-                                          else_=default)
+            # attr = sa_sql.expression.case([(model_attr != None,
+            #                               model_attr), ],
+            #                               else_=default)
+            attr = model_attr
             if sort_dirs[i] == 'desc':
                 crit_attrs.append((attr < marker_values[i]))
             elif sort_dirs[i] == 'asc':
@@ -568,13 +571,13 @@ def image_get_all(context, filters=None, marker=None, limit=None,
                        relevant tag entries. This could improve upper-layer
                        query performance, to prevent using separated calls
     """
-    print("""[DEBUG_GLANCE] image_get_all(context=%s, filters=%s, marker=%s, limit=%s,
-                  sort_key=%s,                        sort_dir=%s,
-                  member_status=%s,            is_public=%s,
-                  admin_as_user=%s, return_tag=%s)""" % (context, filters, marker, limit,
-                  sort_key,                        sort_dir,
-                  member_status,            is_public,
-                  admin_as_user, return_tag))
+    # print("""[DEBUG_GLANCE] image_get_all(context=%s, filters=%s, marker=%s, limit=%s,
+    #               sort_key=%s,                        sort_dir=%s,
+    #               member_status=%s,            is_public=%s,
+    #               admin_as_user=%s, return_tag=%s)""" % (context, filters, marker, limit,
+    #               sort_key,                        sort_dir,
+    #               member_status,            is_public,
+    #               admin_as_user, return_tag))
 
 
     sort_key = ['created_at'] if not sort_key else sort_key
@@ -597,41 +600,41 @@ def image_get_all(context, filters=None, marker=None, limit=None,
     img_cond, prop_cond, tag_cond = _make_conditions_from_filters(
         filters, is_public)
 
-    print(type(member_status))
-    print("""will call _select_images_query(%s,
-                                 %s,
-                                 %s,
-                                 %s,
-                                 %s)""" % (context,
-                                 img_cond,
-                                 admin_as_user,
-                                 member_status,
-                                 visibility))
+    # print(type(member_status))  
+    # print("""will call _select_images_query(%s,
+    #                              %s,
+    #                              %s,
+    #                              %s,
+    #                              %s)""" % (context,
+    #                              img_cond,
+    #                              admin_as_user,
+    #                              member_status,
+    #                              visibility))
     query = _select_images_query(context,
                                  img_cond,
                                  admin_as_user,
                                  member_status,
                                  visibility)
-    print("[DEBUG_GLANCE 1] query(%s) => ?" % (query))
-    print("[DEBUG_GLANCE 1a] query(%s) => %s" % (query, query.all()))
+    # print("[DEBUG_GLANCE 1] query(%s) => ?" % (query))
+    # print("[DEBUG_GLANCE 1a] query(%s) => %s" % (query, query.all()))
     if visibility is not None:
         if visibility == 'public':
             query = query.filter(models.Image.is_public == True)
         elif visibility == 'private':
             query = query.filter(models.Image.is_public == False)
-    print("[DEBUG_GLANCE 1b] query(%s) => %s" % (query, query.all()))
+    # print("[DEBUG_GLANCE 1b] query(%s) => %s" % (query, query.all()))
 
     if prop_cond:
         for prop_condition in prop_cond:
             query = query.join(models.ImageProperty, aliased=True).filter(
                 and_(*prop_condition))
-    print("[DEBUG_GLANCE 1c] query(%s) => %s" % (query, query.all()))
+    # print("[DEBUG_GLANCE 1c] query(%s) => %s" % (query, query.all()))
 
     if tag_cond:
         for tag_condition in tag_cond:
             query = query.join(models.ImageTag, aliased=True).filter(
                 and_(*tag_condition))
-    print("[DEBUG_GLANCE 1d] query(%s) => %s" % (query, query.all()))
+    # print("[DEBUG_GLANCE 1d] query(%s) => %s" % (query, query.all()))
 
     marker_image = None
     if marker is not None:
@@ -643,31 +646,31 @@ def image_get_all(context, filters=None, marker=None, limit=None,
         if key not in sort_key:
             sort_key.append(key)
             sort_dir.append(default_sort_dir)
-    print("[DEBUG_GLANCE 2] query(%s) => %s" % (query, query.all()))
+    # print("[DEBUG_GLANCE 2] query(%s) => %s" % (query, query.all()))
     query = _paginate_query(query, models.Image, limit,
                             sort_key,
                             marker=marker_image,
                             sort_dir=None,
                             sort_dirs=sort_dir)
-    print("[DEBUG_GLANCE 3] query(%s) => %s" % (query, query.all()))
+    # print("[DEBUG_GLANCE 3] query(%s) => %s" % (query, query.all()))
     query = query.options(sa_orm.joinedload(
         models.Image.properties)).options(
             sa_orm.joinedload(models.Image.locations))
     if return_tag:
         query = query.options(sa_orm.joinedload(models.Image.tags))
     images_from_db = query.all()
-    print("[DEBUG_GLANCE] query(%s) => %s" % (query, images_from_db))
+    # print("[DEBUG_GLANCE] query(%s) => %s" % (query, images_from_db))
     images = []
     for image in images_from_db:
-        if type(image) is list:
-            print("[ERROR_GLANCE] image => %s" % (image))
+        # if type(image) is list:
+        #     print("[ERROR_GLANCE] image => %s" % (image))
         image_dict = image.to_dict()
         image_dict = _normalize_locations(context, image_dict,
                                           force_show_deleted=showing_deleted)
         if return_tag:
             image_dict = _normalize_tags(image_dict)
         images.append(image_dict)
-    print("[DEBUG_GLANCE] images <- %s" % (images))
+    # print("[DEBUG_GLANCE] images <- %s" % (images))
     return images
 
 
