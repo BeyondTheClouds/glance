@@ -102,7 +102,7 @@ common_opts = [
     cfg.IntOpt('image_location_quota', default=10,
                help=_('Maximum number of locations allowed on an image. '
                       'Negative values evaluate to unlimited.')),
-    cfg.StrOpt('data_api', default='glance.db.sqlalchemy.api',
+    cfg.StrOpt('data_api', default='glance.db.discovery.api',
                help=_('Python module path of data access API')),
     cfg.IntOpt('limit_param_default', default=25,
                help=_('Default value for the number of items returned by a '
