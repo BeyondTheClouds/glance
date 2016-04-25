@@ -65,31 +65,6 @@ class JSONEncodedDict(TypeDecorator):
             value = jsonutils.loads(value)
         return value
 
-
-    def delete(self, session=None):
-        """Delete this object."""
-        self.deleted = True
-        self.deleted_at = timeutils.utcnow()
-        self.save(session=session)
-
-    def keys(self):
-        return self.__dict__.keys()
-
-    def values(self):
-        return self.__dict__.values()
-
-    def items(self):
-        return self.__dict__.items()
-
-    def to_dict(self):
-        d = self.__dict__.copy()
-        # NOTE(flaper87): Remove
-        # private state instance
-        # It is not serializable
-        # and causes CircularReference
-        d.pop("_sa_instance_state")
-        return d
-
 @global_scope
 class Image(BASE, GlanceBase):
     """Represents an image in the datastore."""
